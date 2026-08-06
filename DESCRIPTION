@@ -1,0 +1,22 @@
+Package: shapeMetrics
+Title: Shape and Compactness Metrics for Spatial Polygons
+Version: 0.1.0
+Authors@R: person("Guilherme", "Correia", email="guilhermegcorreia9@gmail.com", role=c("aut", "cre"))
+Description: Implements a comprehensive set of shape and compactness indices 
+    for polygon geometries (sf objects) with optional parallel computation. 
+    Inspired by the 'vectormetrics' package (patch metrics) and the 
+    'redistmetrics' package (compactness measures). All metrics are 
+    re-implemented from scratch based on the original formulas.
+License: MIT + file LICENSE
+Depends: R (>= 3.5.0)
+Imports: 
+    sf,
+    future,
+    future.apply
+Suggests: 
+    knitr,
+    rmarkdown
+URL: https://github.com/guilhermegcorreia9-sketch/shapeMetrics
+BugReports: https://github.com/guilhermegcorreia9-sketch/shapeMetrics/issues
+Encoding: UTF-8
+Config/roxygen2/version: 8.1.0

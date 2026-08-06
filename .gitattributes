@@ -1,0 +1,5 @@
+* text=auto
+*.Rd text eol=lf
+*.R text eol=lf
+DESCRIPTION text eol=lf
+NAMESPACE text eol=lf
