@@ -217,6 +217,25 @@ check_valid_geometry <- function(sf_obj) {
   invisible(TRUE)
 }
 
+#' Check if all geometries in an sf object are polygons
+#'
+#' @param sf_obj An sf object.
+#' @return Invisibly returns TRUE if all geometries are polygons; otherwise stops with error.
+#' @keywords internal
+check_polygon_geometry <- function(sf_obj) {
+  is_polygon <- sf::st_is(sf_obj, "POLYGON")
+  
+  if (any(!is_polygon)) {
+    invalid_indices <- which(!is_polygon)
+    stop(sprintf(
+      "Non-polygon geometries detected at indices: %s. Please provide only POLYGON geometries.",
+      paste(invalid_indices, collapse = ", ")
+    ))
+  }
+  
+  invisible(TRUE)
+}
+
 #' Disable s2 for geographic CRS and return previous state
 #'
 #' If the sf object has a geographic CRS and s2 is currently enabled,
@@ -819,6 +838,7 @@ calc_squareness <- function(poly) {
 add_metric <- function(sf_obj, calc_func, col_name, ncores = 1, quiet = FALSE, ...) {
   check_sf(sf_obj)
   check_valid_geometry(sf_obj)
+  check_polygon_geometry(sf_obj)
   
   if (is.null(ncores) || ncores < 1) ncores <- 1
   ncores <- as.integer(ncores)
@@ -873,7 +893,6 @@ add_metric <- function(sf_obj, calc_func, col_name, ncores = 1, quiet = FALSE, .
 #' Standard geometric measure.
 #' @export
 area <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_area, "area", ncores, quiet = quiet)
 }
 
@@ -887,7 +906,6 @@ area <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure; often used in landscape ecology.
 #' @export
 bounding_rect_area <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_bounding_rect_area, "bounding_rect_area", ncores, quiet = quiet)
 }
 
@@ -903,7 +921,6 @@ bounding_rect_area <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' (Axis-aligned version is a common variant.)
 #' @export
 box_reock <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_box_reock, "box_reock", ncores, quiet = quiet)
 }
 
@@ -920,7 +937,6 @@ box_reock <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' *Geographical Review*, 54(4), 561-572.
 #' @export
 boyce_clark <- function(sf_obj, ncores = 1, n_radii = 16, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "boyce_clark")
   result <- add_metric(sf_obj, calc_boyce_clark, "boyce_clark", ncores, quiet = quiet, n_radii = n_radii)
   if (!is.null(previous_s2)) {
@@ -940,7 +956,6 @@ boyce_clark <- function(sf_obj, ncores = 1, n_radii = 16, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4: Spatial Pattern Analysis Program.
 #' @export
 circularity <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_circularity, "circularity", ncores, quiet = quiet)
 }
 
@@ -958,7 +973,6 @@ circularity <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' *Ecology*, 77(4), 1210-1225.
 #' @export
 cohesion <- function(sf_obj, ncores = 1, n_samples = 1000, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "cohesion")
   result <- add_metric(sf_obj, calc_cohesion, "cohesion", ncores, quiet = quiet, n_samples = n_samples)
   if (!is.null(previous_s2)) {
@@ -980,7 +994,6 @@ cohesion <- function(sf_obj, ncores = 1, n_samples = 1000, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 compactness <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_compactness, "compactness", ncores, quiet = quiet)
 }
 
@@ -994,7 +1007,6 @@ compactness <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure.
 #' @export
 convex_hull_area <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_convex_hull_area, "convex_hull_area", ncores, quiet = quiet)
 }
 
@@ -1008,7 +1020,6 @@ convex_hull_area <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 convex_hull_compact <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_convex_hull_compact, "convex_hull_compact", ncores, quiet = quiet)
 }
 
@@ -1022,7 +1033,6 @@ convex_hull_compact <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure.
 #' @export
 convex_hull_perimeter <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_convex_hull_perimeter, "convex_hull_perimeter", ncores, quiet = quiet)
 }
 
@@ -1036,7 +1046,6 @@ convex_hull_perimeter <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 convexity <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_convexity, "convexity", ncores, quiet = quiet)
 }
 
@@ -1052,7 +1061,6 @@ convexity <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 detour <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_detour, "detour", ncores, quiet = quiet)
 }
 
@@ -1066,7 +1074,6 @@ detour <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 elongation <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_elongation, "elongation", ncores, quiet = quiet)
 }
 
@@ -1082,7 +1089,6 @@ elongation <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 equiv_rectangular <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_equiv_rectangular, "equiv_rectangular", ncores, quiet = quiet)
 }
 
@@ -1099,7 +1105,6 @@ equiv_rectangular <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 exchange <- function(sf_obj, ncores = 1, n_samples = 1000, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "exchange")
   result <- add_metric(sf_obj, calc_exchange, "exchange", ncores, quiet = quiet, n_samples = n_samples)
   if (!is.null(previous_s2)) {
@@ -1119,7 +1124,6 @@ exchange <- function(sf_obj, ncores = 1, n_samples = 1000, quiet = FALSE) {
 #' Also used in FRAGSTATS.
 #' @export
 fractal_dimension <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_fractal_dimension, "fractal_dimension", ncores, quiet = quiet)
 }
 
@@ -1134,7 +1138,6 @@ fractal_dimension <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 girth <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "girth")
   result <- add_metric(sf_obj, calc_girth, "girth", ncores, quiet = quiet)
   if (!is.null(previous_s2)) {
@@ -1153,7 +1156,6 @@ girth <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure.
 #' @export
 inscribed_radius <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "inscribed_radius")
   result <- add_metric(sf_obj, calc_inscribed_radius, "inscribed_radius", ncores, quiet = quiet)
   if (!is.null(previous_s2)) {
@@ -1172,7 +1174,6 @@ inscribed_radius <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure.
 #' @export
 major_axis <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_major_axis, "major_axis", ncores, quiet = quiet)
 }
 
@@ -1186,7 +1187,6 @@ major_axis <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure.
 #' @export
 minor_axis <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_minor_axis, "minor_axis", ncores, quiet = quiet)
 }
 
@@ -1200,7 +1200,6 @@ minor_axis <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Standard geometric measure.
 #' @export
 perimeter <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_perimeter, "perimeter", ncores, quiet = quiet)
 }
 
@@ -1215,7 +1214,6 @@ perimeter <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 perimeter_area_ratio <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_perimeter_area_ratio, "perimeter_area_ratio", ncores, quiet = quiet)
 }
 
@@ -1231,7 +1229,6 @@ perimeter_area_ratio <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 perimeter_index <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_perimeter_index, "perimeter_index", ncores, quiet = quiet)
 }
 
@@ -1248,7 +1245,6 @@ perimeter_index <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' *Yale Law & Policy Review*, 9(2), 301-353.
 #' @export
 polsby_popper <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_polsby_popper, "polsby_popper", ncores, quiet = quiet)
 }
 
@@ -1265,7 +1261,6 @@ polsby_popper <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 proximity <- function(sf_obj, ncores = 1, n_samples = 1000, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "proximity")
   result <- add_metric(sf_obj, calc_proximity, "proximity", ncores, quiet = quiet, n_samples = n_samples)
   if (!is.null(previous_s2)) {
@@ -1286,7 +1281,6 @@ proximity <- function(sf_obj, ncores = 1, n_samples = 1000, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 range_index <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_range_index, "range_index", ncores, quiet = quiet)
 }
 
@@ -1304,7 +1298,6 @@ range_index <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' Also used in FRAGSTATS.
 #' @export
 rectangularity <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_rectangularity, "rectangularity", ncores, quiet = quiet)
 }
 
@@ -1320,7 +1313,6 @@ rectangularity <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' @return sf object with column `reock`.
 #' @export
 reock <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_reock, "reock", ncores, quiet = quiet)
 }
 
@@ -1334,7 +1326,6 @@ reock <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 roughness <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_roughness, "roughness", ncores, quiet = quiet)
 }
 
@@ -1349,7 +1340,6 @@ roughness <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' @return sf object with column `schwartzberg`.
 #' @export
 schwartzberg <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_schwartzberg, "schwartzberg", ncores, quiet = quiet)
 }
 
@@ -1363,7 +1353,6 @@ schwartzberg <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 shape_index <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_shape_index, "shape_index", ncores, quiet = quiet)
 }
 
@@ -1377,7 +1366,6 @@ shape_index <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 skew <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "skew")
   result <- add_metric(sf_obj, calc_skew, "skew", ncores, quiet = quiet)
   if (!is.null(previous_s2)) {
@@ -1396,7 +1384,6 @@ skew <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 sphericity <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   previous_s2 <- disable_s2_if_geographic(sf_obj, "sphericity")
   result <- add_metric(sf_obj, calc_sphericity, "sphericity", ncores, quiet = quiet)
   if (!is.null(previous_s2)) {
@@ -1417,7 +1404,6 @@ sphericity <- function(sf_obj, ncores = 1, quiet = FALSE) {
 #' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
 #' @export
 squareness <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  check_sf(sf_obj)
   add_metric(sf_obj, calc_squareness, "squareness", ncores, quiet = quiet)
 }
 
@@ -1441,8 +1427,12 @@ squareness <- function(sf_obj, ncores = 1, quiet = FALSE) {
 shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
   check_sf(sf_obj)
   check_sf(ref, "ref")
+  
   check_valid_geometry(sf_obj)
   check_valid_geometry(ref)
+  
+  check_polygon_geometry(sf_obj)
+  check_polygon_geometry(ref)
   
   previous_s2_main <- disable_s2_if_geographic(sf_obj, "shared_boundary")
   previous_s2_ref <- disable_s2_if_geographic(ref, "shared_boundary")
@@ -1533,6 +1523,7 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
 calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
   check_sf(sf_obj)
   check_valid_geometry(sf_obj)
+  check_polygon_geometry(sf_obj)
   
   if (ncores > 1) {
     message(sprintf("Using parallel processing with %d cores for all metrics.", ncores))
@@ -1631,7 +1622,6 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
 #' Based on the metrics described in the redistmetrics package.
 #' @export
 compactness_metrics <- function(sf_obj, ncores = 1, ...) {
-  check_sf(sf_obj)
   metrics <- list(
     polsby_popper     = polsby_popper,
     schwartzberg      = schwartzberg,
@@ -1662,7 +1652,6 @@ compactness_metrics <- function(sf_obj, ncores = 1, ...) {
 #' Inspired by the patch metrics described in the vectormetrics package.
 #' @export
 shape_metrics <- function(sf_obj, ncores = 1, ...) {
-  check_sf(sf_obj)
   metrics <- list(
     polsby_popper     = polsby_popper,
     circularity       = circularity,
