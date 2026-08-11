@@ -194,7 +194,10 @@ check_sf <- function(obj, arg_name = "sf_obj") {
     stop(sprintf("The object provided as '%s' is not an sf object. Please provide an sf object with polygon geometries.", arg_name))
   }
   crs <- st_crs(obj)
-  if (!is.na(crs) && !is.null(crs) && st_is_longlat(crs)) {
+  if (is.null(crs) || is.na(crs)) {
+    stop("The provided 'sf' object has an undefined or invalid CRS.")
+  }
+  if (st_is_longlat(crs)) {
     warning("Input data has a geographic CRS (latitude/longitude). Measurements will be computed on the ellipsoid (WGS84). For more accurate planar metrics, consider projecting to a local projected CRS using st_transform().")
   }
   invisible(TRUE)
