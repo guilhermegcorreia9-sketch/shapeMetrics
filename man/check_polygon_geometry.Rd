@@ -4,10 +4,12 @@
 \alias{check_polygon_geometry}
 \title{Check if all geometries in an sf object are polygons}
 \usage{
-check_polygon_geometry(sf_obj)
+check_polygon_geometry(sf_obj, type = "POLYGON")
 }
 \arguments{
 \item{sf_obj}{An sf object.}
+
+\item{type}{Valid geometry type.}
 }
 \value{
 Invisibly returns TRUE if all geometries are polygons; otherwise stops with error.

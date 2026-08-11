@@ -220,16 +220,19 @@ check_valid_geometry <- function(sf_obj) {
 #' Check if all geometries in an sf object are polygons
 #'
 #' @param sf_obj An sf object.
+#' @param type Valid geometry type.
 #' @return Invisibly returns TRUE if all geometries are polygons; otherwise stops with error.
 #' @keywords internal
-check_polygon_geometry <- function(sf_obj) {
-  is_polygon <- sf::st_is(sf_obj, "POLYGON")
+check_polygon_geometry <- function(sf_obj, type = "POLYGON") {
+  is_polygon <- sf::st_is(sf_obj, type)
   
   if (any(!is_polygon)) {
     invalid_indices <- which(!is_polygon)
+    type_formatted <- paste(type, collapse = " or ")
     stop(sprintf(
-      "Non-polygon geometries detected at indices: %s. Please provide only POLYGON geometries.",
-      paste(invalid_indices, collapse = ", ")
+      "Non-polygon geometries detected at indices: %s. Please provide only %s geometries.",
+      paste(invalid_indices, collapse = ", "),
+      type_formatted
     ))
   }
   
@@ -1432,6 +1435,7 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
   check_valid_geometry(ref)
   
   check_polygon_geometry(sf_obj)
+  check_polygon_geometry(ref, type = c("POLYGON", "MULTIPOLYGON"))
   
   previous_s2_main <- disable_s2_if_geographic(sf_obj, "shared_boundary")
   previous_s2_ref <- disable_s2_if_geographic(ref, "shared_boundary")
