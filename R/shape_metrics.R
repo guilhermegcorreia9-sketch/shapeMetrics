@@ -1432,7 +1432,6 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
   check_valid_geometry(ref)
   
   check_polygon_geometry(sf_obj)
-  check_polygon_geometry(ref)
   
   previous_s2_main <- disable_s2_if_geographic(sf_obj, "shared_boundary")
   previous_s2_ref <- disable_s2_if_geographic(ref, "shared_boundary")
