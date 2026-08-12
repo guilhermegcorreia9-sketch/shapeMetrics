@@ -863,21 +863,75 @@ add_metric <- function(sf_obj, calc_func, col_name, ncores = 1, quiet = FALSE, .
     future::plan("multisession", workers = ncores)
   }
   
-  polys <- split(sf_obj, 1:nrow(sf_obj))
+  n_rows <- nrow(sf_obj)
   
-  values <- tryCatch({
-    future.apply::future_lapply(seq_along(polys), function(i) {
-      tryCatch({
-        calc_func(polys[[i]], ...)
-      }, error = function(e) {
-        warning(sprintf("Error calculating metric for polygon %d: %s", i, e$message))
-        return(NA)
+  # Chunk processing thereshold
+  CHUNK_THRESHOLD <- 100000
+  
+  values <- if (n_rows > CHUNK_THRESHOLD) {
+    # Large count polygons
+    chunk_size <- 5000
+    n_chunks <- ceiling(n_rows / chunk_size)
+  
+    if (!quiet) {
+      message(sprintf("Large dataset (%d polygons). Processing in %d chunks.", 
+                      n_rows, n_chunks))
+    }
+    
+    # Chunk processing function
+    process_chunk <- function(chunk_idx) {
+      start <- (chunk_idx - 1) * chunk_size + 1
+      end <- min(chunk_idx * chunk_size, n_rows)
+      chunk <- sf_obj[start:end, ]
+      
+      gc()
+      
+      # Sequential polygon processing inside the chunk
+      chunk_results <- lapply(seq_len(nrow(chunk)), function(j) {
+        tryCatch({
+          calc_func(chunk[j, ], ...)
+        }, error = function(e) {
+          warning(sprintf("Error calculating metric for polygon %d: %s", 
+                          start + j - 1, e$message))
+          return(NA)
+        })
       })
-    }, future.seed = TRUE)
-  }, interrupt = function(e) {
-    message("Processing interrupted by user.")
-    stop(e)
-  })
+      
+      # Liberar chunk da memória explicitamente
+      rm(chunk)
+      gc()
+      
+      return(chunk_results)
+    }
+    
+    # Parallel chunk processing
+    chunk_results_list <- tryCatch({
+      future.apply::future_lapply(seq_len(n_chunks), process_chunk, 
+                                  future.seed = TRUE)
+    }, interrupt = function(e) {
+      message("Processing interrupted by user.")
+      stop(e)
+    })
+    
+    unlist(chunk_results_list, recursive = FALSE)
+  } else {
+    # Low polygon count method
+    tryCatch({
+      future.apply::future_lapply(seq_len(n_rows), function(i) {
+        tryCatch({
+          calc_func(sf_obj[i, ], ...)
+        }, error = function(e) {
+          warning(sprintf("Error calculating metric for polygon %d: %s", i, e$message))
+          return(NA)
+        })
+      }, future.seed = TRUE)
+    }, interrupt = function(e) {
+      message("Processing interrupted by user.")
+      stop(e)
+    })
+  }
+  
+  gc()
   
   sf_obj[[col_name]] <- unlist(values)
   return(sf_obj)
@@ -1472,33 +1526,87 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
                       ncores, max_cores, max_cores - 1))
       ncores <- max(1, max_cores - 1)
     }
+    
     if (ncores > 1 && !quiet) {
       message(sprintf("Using parallel processing with %d cores.", ncores))
     }
+    
     if (ncores > 1) {
       future::plan("multisession", workers = ncores)
     }
-    polys <- split(sf_obj, 1:nrow(sf_obj))
-    values <- tryCatch({
-      future.apply::future_lapply(seq_along(polys), function(i) {
-        tryCatch({
-          calc_func(polys[[i]], ref_poly)
-        }, error = function(e) {
-          warning(sprintf("Error calculating shared boundary for polygon %d: %s", i, e$message))
-          return(NA)
+    
+    n_rows <- nrow(sf_obj)
+    CHUNK_THRESHOLD <- 100000
+    
+    values <- if (n_rows > CHUNK_THRESHOLD) {
+      chunk_size <- 5000
+      n_chunks <- ceiling(n_rows / chunk_size)
+      
+      if (!quiet) {
+        message(sprintf("Large dataset (%d polygons). Processing in %d chunks.", 
+                        n_rows, n_chunks))
+      }
+      
+      process_chunk <- function(chunk_idx) {
+        start <- (chunk_idx - 1) * chunk_size + 1
+        end <- min(chunk_idx * chunk_size, n_rows)
+        chunk <- sf_obj[start:end, ]
+        
+        gc()
+        
+        chunk_results <- lapply(seq_len(nrow(chunk)), function(j) {
+          tryCatch({
+            calc_func(chunk[j, ], ref_poly)
+          }, error = function(e) {
+            warning(sprintf("Error calculating shared boundary for polygon %d: %s", 
+                            start + j - 1, e$message))
+            return(NA)
+          })
         })
-      }, future.seed = TRUE)
-    }, interrupt = function(e) {
-      message("Processing interrupted by user.")
-      stop(e)
-    })
+        
+        # Liberar chunk da memória explicitamente
+        rm(chunk)
+        gc()
+        
+        return(chunk_results)
+      }
+      
+      chunk_results_list <- tryCatch({
+        future.apply::future_lapply(seq_len(n_chunks), process_chunk, 
+                                    future.seed = TRUE)
+      }, interrupt = function(e) {
+        message("Processing interrupted by user.")
+        stop(e)
+      })
+      
+      unlist(chunk_results_list, recursive = FALSE)
+      
+    } else {
+      # Modo normal: iterar por índices (sem split)
+      tryCatch({
+        future.apply::future_lapply(seq_len(n_rows), function(i) {
+          tryCatch({
+            calc_func(sf_obj[i, ], ref_poly)
+          }, error = function(e) {
+            warning(sprintf("Error calculating shared boundary for polygon %d: %s", i, e$message))
+            return(NA)
+          })
+        }, future.seed = TRUE)
+      }, interrupt = function(e) {
+        message("Processing interrupted by user.")
+        stop(e)
+      })
+    }
+    
+    gc()
+    
     sf_obj[[col_name]] <- unlist(values)
     return(sf_obj)
   }
   
   result <- add_metric_with_ref(sf_obj, calc_shared, ref_poly, "shared_boundary", ncores, quiet = quiet)
   
-  # Restaurar s2 (se foi alterado)
+  # Restore s2 (if it was altered)
   if (!is.null(previous_s2_main)) {
     sf_use_s2(previous_s2_main)
   }
