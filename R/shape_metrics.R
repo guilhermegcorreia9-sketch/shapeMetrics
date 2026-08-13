@@ -27,7 +27,7 @@
 #' @import future.apply
 
 # Declare global variables to avoid R CMD check notes
-utils::globalVariables("st_oriented_bbox")
+utils::globalVariables(c("st_oriented_bbox", "calc_squareness"))
 
 # =============================================================================
 # INTERNAL GEOMETRIC HELPERS
@@ -815,22 +815,11 @@ calc_sphericity <- function(poly) {
 }
 
 #' @keywords internal
-calc_squareness <- function(poly) {
-  ap <- get_area_perimeter(poly)
-  if (ap$area == 0 || ap$perimeter == 0 || is.na(ap$area) || is.na(ap$perimeter)) {
-    warning("Zero or NA area or perimeter. Returning NA.")
-    return(NA)
-  }
-  side <- sqrt(ap$area)
-  perim_square <- 4 * side
-  perim_square / ap$perimeter
-}
-
-#' @keywords internal
 calc_p_gyradius <- function(poly) {
-  centroid <- st_centroid(poly)
-  if (is.na(centroid) || length(centroid) == 0) {
-    warning("Could not compute centroid. Returning NA.")
+  centroid <- get_point_on_surface(poly)
+  # Verifica se é um POINT válido (NÃO use is.na() em geometrias!)
+  if (!inherits(centroid, "POINT")) {
+    warning("Could not obtain a valid point on surface. Returning NA.")
     return(NA)
   }
   boundary <- st_boundary(poly)
@@ -851,9 +840,10 @@ calc_p_gyradius <- function(poly) {
 
 #' @keywords internal
 calc_polradius <- function(poly) {
-  centroid <- st_centroid(poly)
-  if (is.na(centroid) || length(centroid) == 0) {
-    warning("Could not compute centroid. Returning NA.")
+  centroid <- get_point_on_surface(poly)
+  # Verifica se é um POINT válido (NÃO use is.na() em geometrias!)
+  if (!inherits(centroid, "POINT")) {
+    warning("Could not obtain a valid point on surface. Returning NA.")
     return(NA)
   }
   boundary <- st_boundary(poly)
@@ -1743,14 +1733,19 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
 #' By default, includes all implemented shape/compactness metrics and geometric attributes.
 #'
 #' @param sf_obj An sf object.
-#' @param metrics A named list of functions. If \code{NULL}, uses all available metrics.
+#' @param metrics A named list of functions, a character vector of metric names, or \code{NULL}.
+#'   If \code{NULL}, uses all available metrics. If a character vector, each element must
+#'   correspond to a valid metric name (e.g., \code{c("area", "polsby_popper")}).
 #' @param ncores Number of cores for each metric. Default is 1 (sequential).
+#' @param progress Logical. If \code{TRUE}, displays a progress bar while processing metrics.
+#'   Default is \code{FALSE}.
 #' @param ... Additional arguments passed to each metric function.
 #' @return The sf object with all metric columns added.
 #' @references
 #' The metrics are based on standard landscape ecology and spatial analysis literature.
+#' @importFrom utils flush.console
 #' @export
-calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
+calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, progress = FALSE, ...) {
   check_sf(sf_obj)
   check_valid_geometry(sf_obj)
   check_polygon_geometry(sf_obj)
@@ -1759,6 +1754,7 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
     message(sprintf("Using parallel processing with %d cores for all metrics.", ncores))
   }
   
+  # --- Default metrics list ---
   default_metrics <- list(
     area                  = area,
     bounding_rect_area    = bounding_rect_area,
@@ -1781,7 +1777,7 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
     major_axis            = major_axis,
     minor_axis            = minor_axis,
     p_density             = p_density,
-    p_gyradius            = p_gyradius, 
+    p_gyradius            = p_gyradius,
     perimeter             = perimeter,
     perimeter_area_ratio  = perimeter_area_ratio,
     perimeter_index       = perimeter_index,
@@ -1800,30 +1796,62 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
   )
   valid_metric_names <- names(default_metrics)
   
+  # --- Metrics validation ---
   if (is.null(metrics)) {
     metrics <- default_metrics
   } else {
-    if (is.null(names(metrics)) || any(names(metrics) == "")) {
-      stop("The 'metrics' list must be a named list with metric names as names.")
-    }
-    invalid_names <- setdiff(names(metrics), valid_metric_names)
-    if (length(invalid_names) > 0) {
-      if (length(metrics) == length(invalid_names)) {
-        stop(sprintf(
-          "None of the provided metric names are valid. Valid metrics are: %s",
-          paste(valid_metric_names, collapse = ", ")
-        ))
-      } else {
-        warning(sprintf(
-          "The following metric(s) are not implemented and will be ignored: %s",
-          paste(invalid_names, collapse = ", ")
-        ))
-        metrics <- metrics[names(metrics) %in% valid_metric_names]
+    if (is.character(metrics)) {
+      metric_names <- metrics
+      valid_idx <- metric_names %in% valid_metric_names
+      invalid_names <- metric_names[!valid_idx]
+      
+      if (length(invalid_names) > 0) {
+        if (length(metric_names) == length(invalid_names)) {
+          stop(sprintf(
+            "None of the provided metric names are valid. Valid metrics are: %s",
+            paste(valid_metric_names, collapse = ", ")
+          ))
+        } else {
+          warning(sprintf(
+            "The following metric(s) are not implemented and will be ignored: %s",
+            paste(invalid_names, collapse = ", ")
+          ))
+          metric_names <- metric_names[valid_idx]
+        }
+      }
+      if (length(metric_names) == 0) {
+        stop("No valid metrics remaining after filtering.")
+      }
+      pkg_env <- asNamespace("shapeMetrics")
+      metrics <- lapply(metric_names, function(name) {
+        get(name, envir = pkg_env, mode = "function")
+      })
+      names(metrics) <- metric_names
+    } else {
+      if (is.null(names(metrics)) || any(names(metrics) == "")) {
+        stop("The 'metrics' list must be a named list with metric names as names, or a character vector of metric names.")
+      }
+      invalid_names <- setdiff(names(metrics), valid_metric_names)
+      if (length(invalid_names) > 0) {
+        if (length(metrics) == length(invalid_names)) {
+          stop(sprintf(
+            "None of the provided metric names are valid. Valid metrics are: %s",
+            paste(valid_metric_names, collapse = ", ")
+          ))
+        } else {
+          warning(sprintf(
+            "The following metric(s) are not implemented and will be ignored: %s",
+            paste(invalid_names, collapse = ", ")
+          ))
+          metrics <- metrics[names(metrics) %in% valid_metric_names]
+        }
+      }
+      if (length(metrics) == 0) {
+        stop("No valid metrics remaining after filtering.")
       }
     }
-    if (length(metrics) == 0) {
-      stop("No valid metrics remaining after filtering.")
-    }
+    
+    # shared_boundary handling
     if ("shared_boundary" %in% names(metrics)) {
       if (length(metrics) == 1) {
         stop("'shared_boundary' is not supported by calc_multiple_metrics because it requires an extra 'ref' argument. Use shared_boundary() directly.")
@@ -1837,10 +1865,31 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
     }
   }
   
-  for (name in names(metrics)) {
-    message(sprintf("Calculating %s...", name))
+  # --- Loop with progress (via cat) ---
+  n_metrics <- length(metrics)
+  metric_names <- names(metrics)
+  
+  if (progress && n_metrics > 0) {
+    cat("\nProcessing metrics: 0%")
+    flush.console()
+  }
+  
+  for (i in seq_along(metrics)) {
+    name <- metric_names[i]
+    
+    if (progress && n_metrics > 0) {
+      pct <- round((i / n_metrics) * 100)
+      cat(sprintf("\rProcessing metrics: %d%%", pct))
+      flush.console()
+    }
+    
     sf_obj <- metrics[[name]](sf_obj, ncores = ncores, quiet = TRUE, ...)
   }
+  
+  if (progress && n_metrics > 0) {
+    cat("\n")
+  }
+  
   return(sf_obj)
 }
 

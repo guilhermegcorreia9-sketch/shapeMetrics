@@ -4,14 +4,25 @@
 \alias{calc_multiple_metrics}
 \title{Calculate Multiple Metrics}
 \usage{
-calc_multiple_metrics(sf_obj, metrics = NULL, ncores = 1, ...)
+calc_multiple_metrics(
+  sf_obj,
+  metrics = NULL,
+  ncores = 1,
+  progress = FALSE,
+  ...
+)
 }
 \arguments{
 \item{sf_obj}{An sf object.}
 
-\item{metrics}{A named list of functions. If \code{NULL}, uses all available metrics.}
+\item{metrics}{A named list of functions, a character vector of metric names, or \code{NULL}.
+If \code{NULL}, uses all available metrics. If a character vector, each element must
+correspond to a valid metric name (e.g., \code{c("area", "polsby_popper")}).}
 
 \item{ncores}{Number of cores for each metric. Default is 1 (sequential).}
+
+\item{progress}{Logical. If \code{TRUE}, displays a progress bar while processing metrics.
+Default is \code{FALSE}.}
 
 \item{...}{Additional arguments passed to each metric function.}
 }
