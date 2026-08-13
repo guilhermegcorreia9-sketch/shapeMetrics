@@ -253,6 +253,7 @@ check_polygon_geometry <- function(sf_obj, type = "POLYGON") {
 #' @return A logical value: the previous state of s2 (TRUE if s2 was enabled), or NULL if no change.
 #' @keywords internal
 disable_s2_if_geographic <- function(sf_obj, func_name = "function") {
+  check_sf(sf_obj)
   crs <- st_crs(sf_obj)
   if (is.na(crs) || is.null(crs)) {
     return(invisible(NULL))
@@ -823,6 +824,67 @@ calc_squareness <- function(poly) {
   side <- sqrt(ap$area)
   perim_square <- 4 * side
   perim_square / ap$perimeter
+}
+
+#' @keywords internal
+calc_p_gyradius <- function(poly) {
+  centroid <- st_centroid(poly)
+  if (is.na(centroid) || length(centroid) == 0) {
+    warning("Could not compute centroid. Returning NA.")
+    return(NA)
+  }
+  boundary <- st_boundary(poly)
+  if (length(boundary) == 0) {
+    warning("Polygon has no boundary. Returning NA.")
+    return(NA)
+  }
+  pts <- st_cast(boundary, "POINT")
+  if (length(pts) < 1) {
+    warning("No boundary points. Returning NA.")
+    return(NA)
+  }
+  coords <- st_coordinates(pts)
+  cent <- st_coordinates(centroid)
+  dists <- sqrt((coords[,1] - cent[1])^2 + (coords[,2] - cent[2])^2)
+  mean(dists, na.rm = TRUE)
+}
+
+#' @keywords internal
+calc_polradius <- function(poly) {
+  centroid <- st_centroid(poly)
+  if (is.na(centroid) || length(centroid) == 0) {
+    warning("Could not compute centroid. Returning NA.")
+    return(NA)
+  }
+  boundary <- st_boundary(poly)
+  if (length(boundary) == 0) {
+    warning("Polygon has no boundary. Returning NA.")
+    return(NA)
+  }
+  pts <- st_cast(boundary, "POINT")
+  if (length(pts) < 1) {
+    warning("No boundary points. Returning NA.")
+    return(NA)
+  }
+  coords <- st_coordinates(pts)
+  cent <- st_coordinates(centroid)
+  dists <- sqrt((coords[,1] - cent[1])^2 + (coords[,2] - cent[2])^2)
+  max(dists, na.rm = TRUE)
+}
+
+#' @keywords internal
+calc_p_density <- function(poly) {
+  area <- as.numeric(st_area(poly))
+  if (area == 0 || is.na(area)) {
+    warning("Zero or NA area. Returning NA.")
+    return(NA)
+  }
+  radius <- calc_polradius(poly)
+  if (is.na(radius) || radius == 0) {
+    warning("Polygon radius is zero or NA. Returning NA.")
+    return(NA)
+  }
+  area / radius
 }
 
 # =============================================================================
@@ -1467,6 +1529,60 @@ squareness <- function(sf_obj, ncores = 1, quiet = FALSE) {
   add_metric(sf_obj, calc_squareness, "squareness", ncores, quiet = quiet)
 }
 
+#' PGYRATIUS Index
+#'
+#' Computes the PGYRATIUS index: average distance of all vertices to the polygon centroid.
+#'
+#' @inheritParams area
+#' @return The sf object with an additional column `p_gyradius`.
+#' @references
+#' Standard shape metric used in polygon analysis.
+#' @export
+p_gyradius <- function(sf_obj, ncores = 1, quiet = FALSE) {
+  previous_s2 <- disable_s2_if_geographic(sf_obj, "p_gyradius")
+  result <- add_metric(sf_obj, calc_p_gyradius, "p_gyradius", ncores, quiet = quiet)
+  if (!is.null(previous_s2)) {
+    sf_use_s2(previous_s2)
+  }
+  return(result)
+}
+
+#' POLRADIUS Index
+#'
+#' Computes the POLRADIUS index: maximum distance of a vertex to the polygon centroid.
+#'
+#' @inheritParams area
+#' @return The sf object with an additional column `polradius`.
+#' @references
+#' Standard shape metric used in polygon analysis.
+#' @export
+polradius <- function(sf_obj, ncores = 1, quiet = FALSE) {
+  previous_s2 <- disable_s2_if_geographic(sf_obj, "polradius")
+  result <- add_metric(sf_obj, calc_polradius, "polradius", ncores, quiet = quiet)
+  if (!is.null(previous_s2)) {
+    sf_use_s2(previous_s2)
+  }
+  return(result)
+}
+
+#' PDENSITY Index
+#'
+#' Computes the PDENSITY index: \eqn{area / POLRADIUS}.
+#'
+#' @inheritParams area
+#' @return The sf object with an additional column `p_density`.
+#' @references
+#' Standard shape metric used in polygon analysis.
+#' @export
+p_density <- function(sf_obj, ncores = 1, quiet = FALSE) {
+  previous_s2 <- disable_s2_if_geographic(sf_obj, "p_density")
+  result <- add_metric(sf_obj, calc_p_density, "p_density", ncores, quiet = quiet)
+  if (!is.null(previous_s2)) {
+    sf_use_s2(previous_s2)
+  }
+  return(result)
+}
+
 # =============================================================================
 # SHARED BOUNDARY
 # =============================================================================
@@ -1664,9 +1780,12 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, ...) {
     inscribed_radius      = inscribed_radius,
     major_axis            = major_axis,
     minor_axis            = minor_axis,
+    p_density             = p_density,
+    p_gyradius            = p_gyradius, 
     perimeter             = perimeter,
     perimeter_area_ratio  = perimeter_area_ratio,
     perimeter_index       = perimeter_index,
+    polradius             = polradius,
     polsby_popper         = polsby_popper,
     proximity             = proximity,
     range_index           = range_index,
