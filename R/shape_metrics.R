@@ -27,7 +27,7 @@
 #' @import future.apply
 
 # Declare global variables to avoid R CMD check notes
-utils::globalVariables(c("st_oriented_bbox", "calc_squareness"))
+utils::globalVariables(c("st_oriented_bbox"))
 
 # =============================================================================
 # INTERNAL GEOMETRIC HELPERS
@@ -959,7 +959,7 @@ add_metric <- function(sf_obj, calc_func, col_name, ncores = 1, quiet = FALSE, .
     # Parallel chunk processing
     chunk_results_list <- tryCatch({
       future.apply::future_lapply(seq_len(n_chunks), process_chunk, 
-                                  future.seed = TRUE)
+                                  future.seed = TRUE, future.packages = "shapeMetrics")
     }, interrupt = function(e) {
       message("Processing interrupted by user.")
       stop(e)
@@ -976,7 +976,7 @@ add_metric <- function(sf_obj, calc_func, col_name, ncores = 1, quiet = FALSE, .
           warning(sprintf("Error calculating metric for polygon %d: %s", i, e$message))
           return(NA)
         })
-      }, future.seed = TRUE)
+      }, future.seed = TRUE, future.packages = "shapeMetrics")
     }, interrupt = function(e) {
       message("Processing interrupted by user.")
       stop(e)
@@ -1504,21 +1504,6 @@ sphericity <- function(sf_obj, ncores = 1, quiet = FALSE) {
   return(result)
 }
 
-#' Squareness
-#'
-#' Ratio of the perimeter of a square with the same area as the polygon to the
-#' actual perimeter. This is identical to \code{equiv_rectangular}; both are
-#' provided for compatibility.
-#'
-#' @inheritParams area
-#' @return The sf object with an additional column `squareness`.
-#' @references
-#' McGarigal, K., Cushman, S. A., & Ene, E. (2012). FRAGSTATS v4.
-#' @export
-squareness <- function(sf_obj, ncores = 1, quiet = FALSE) {
-  add_metric(sf_obj, calc_squareness, "squareness", ncores, quiet = quiet)
-}
-
 #' PGYRATIUS Index
 #'
 #' Computes the PGYRATIUS index: average distance of all vertices to the polygon centroid.
@@ -1679,7 +1664,7 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
       
       chunk_results_list <- tryCatch({
         future.apply::future_lapply(seq_len(n_chunks), process_chunk, 
-                                    future.seed = TRUE)
+                                    future.seed = TRUE, future.packages = "shapeMetrics")
       }, interrupt = function(e) {
         message("Processing interrupted by user.")
         stop(e)
@@ -1697,7 +1682,7 @@ shared_boundary <- function(sf_obj, ref, ncores = 1, quiet = FALSE) {
             warning(sprintf("Error calculating shared boundary for polygon %d: %s", i, e$message))
             return(NA)
           })
-        }, future.seed = TRUE)
+        }, future.seed = TRUE, future.packages = "shapeMetrics")
       }, interrupt = function(e) {
         message("Processing interrupted by user.")
         stop(e)
@@ -1791,8 +1776,7 @@ calc_multiple_metrics <- function(sf_obj, metrics = NULL, ncores = 1, progress =
     schwartzberg          = schwartzberg,
     shape_index           = shape_index,
     skew                  = skew,
-    sphericity            = sphericity,
-    squareness            = squareness
+    sphericity            = sphericity
   )
   valid_metric_names <- names(default_metrics)
   
@@ -1917,8 +1901,7 @@ compactness_metrics <- function(sf_obj, ncores = 1, ...) {
     perimeter_index   = perimeter_index,
     detour            = detour,
     girth             = girth,
-    range_index       = range_index,
-    squareness        = squareness
+    range_index       = range_index
   )
   calc_multiple_metrics(sf_obj, metrics, ncores, ...)
 }
@@ -1956,8 +1939,7 @@ shape_metrics <- function(sf_obj, ncores = 1, ...) {
     exchange          = exchange,
     girth             = girth,
     proximity         = proximity,
-    range_index       = range_index,
-    squareness        = squareness
+    range_index       = range_index
   )
   calc_multiple_metrics(sf_obj, metrics, ncores, ...)
 }
